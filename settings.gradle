@@ -1,0 +1,18 @@
+pluginManagement {
+	plugins {
+		id 'com.github.spotbugs' version '4.0.0'
+	}
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		gradlePluginPortal()
+		if (rootProject.hasProperty('mavenRepository')) {
+			maven {
+				url mavenRepository
+			}
+		}
+	}
+}
+
+rootProject.name = 'taka8-reactor-sample'
+

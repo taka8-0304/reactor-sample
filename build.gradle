@@ -1,0 +1,121 @@
+plugins {
+	id 'com.github.spotbugs'
+	id 'maven'
+	id 'maven-publish'
+	id 'java'
+	id 'java-library'
+	id 'eclipse'
+	id 'jacoco'
+}
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+group = 'taka8.sample'
+version = '0.0.1'
+def javaVersion = 11
+
+dependencies {
+	api group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+	api group: 'io.projectreactor', name: 'reactor-core', version: '3.4.7'
+	testImplementation group: 'ch.qos.logback', name: 'logback-classic', version: '[1.2,1.3)'
+	testImplementation group: 'ch.qos.logback', name: 'logback-core', version: '[1.2,1.3)'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '[5.0,6.0)'
+	testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '[5.0,6.0)'
+	testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.5.2")
+		compileOnly 'com.github.spotbugs:spotbugs-annotations:4.2.2'
+		testCompile 'com.github.spotbugs:spotbugs-annotations:4.2.2'
+	}
+
+sourceCompatibility = javaVersion
+targetCompatibility = javaVersion
+[
+	compileJava,
+	compileTestJava,
+	javadoc
+]*.options*.encoding = 'UTF-8'
+
+javadoc {
+	options.charSet = 'UTF-8'
+}
+
+def jreContainer = 'org.eclipse.jdt.launching.JRE_CONTAINER'
+jreContainer += '/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-' + javaVersion
+
+eclipse {
+	classpath {
+		containers.clear()
+		containers.add(jreContainer)
+		//default settings for downloading sources and Javadoc:
+		downloadSources = true
+		downloadJavadoc = true
+	}
+}
+
+spotbugs {
+	ignoreFailures = true
+	reportsDir = file("$project.buildDir/reports/spotbugs")
+	reportLevel = "low"
+	excludeFilter = file("findbugs-exclude.xml")
+}
+
+jacoco {
+	applyTo(tasks.withType(JavaExec))
+	toolVersion = '0.8.3'
+}
+
+test {
+	systemProperty 'logback.configurationFile' , "${rootProject.projectDir}/logback.xml"
+	include '**/*Test.class'//, '**/*It.class'
+	useJUnitPlatform()
+	ignoreFailures = true
+	jacoco {
+		enabled = true
+		destinationFile = file("${project.buildDir}/reports/jacoco/jacoco.exec")
+	}
+}
+
+
+//	task jacocoReport(type: JacocoReport) {
+//		executionData test
+//		sourceSets project.sourceSets.main
+//	}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = 'sources'
+	from sourceSets.main.allSource
+}
+
+//	task javadocJar(type: Jar, dependsOn: javadoc) {
+//	    classifier = 'javadoc'
+//	    from javadoc.destinationDir
+//	}
+artifacts {
+	archives sourcesJar
+	archives jar
+	//	    archives javadocJar
+}
+
+publishing {
+	repositories {
+		if (project.hasProperty('mavenRepositoryUpload') || rootProject.hasProperty('mavenRepositoryUpload')) {
+			maven {
+				url mavenRepositoryUpload
+				credentials {
+					username mavenUserName
+					password mavenPassword
+				}
+			}
+		}
+	}
+	publications {
+		java(MavenPublication) {
+			from components.java
+			artifact sourcesJar
+		}
+	}
+}
+
+
