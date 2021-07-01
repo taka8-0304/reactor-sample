@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.context.Context;
 import reactor.util.retry.Retry;
 
@@ -62,6 +63,71 @@ public class MonoTest {
 				Assertions.assertEquals(expected, actual);
 			});
 		}
+	}
+
+	@Test
+	public void testSubscribeSameThread() throws Exception {
+		__logger.info("BEGIN");
+		var mono = Mono.create(s -> {
+			var value = "good";
+			__logger.info("CREATE value=<{}>", value);
+			s.success(value);
+		});
+		mono.subscribe(value -> {
+			__logger.info("SUBSCRIBE value=<{}>", value);
+		});
+		__logger.info("END");
+	}
+
+	@Test
+	public void testSubscribeRunOnOtherThread() throws Exception {
+		__logger.info("BEGIN");
+		var latch = new CountDownLatch(1);
+		var mono = Mono.create(s -> {
+			var value = "good";
+			__logger.info("CREATE value=<{}>", value);
+			s.success(value);
+		}).subscribeOn(Schedulers.single());
+		mono.subscribe(value -> {
+			__logger.info("SUBSCRIBE value=<{}>", value);
+			latch.countDown();
+		});
+		__logger.info("END");
+		latch.await();
+	}
+
+	@Test
+	public void testSubscribeStartWithOtherThread() throws Exception {
+		__logger.info("BEGIN");
+		var latch = new CountDownLatch(1);
+		var mono = Mono.create(s -> {
+			var value = "good";
+			Mono.just(value).subscribeOn(Schedulers.single()).subscribe(v -> {
+				__logger.info("CREATE value=<{}>", value);
+				s.success(v);
+			});
+		});
+		mono.subscribe(value -> {
+			__logger.info("SUBSCRIBE value=<{}>", value);
+			latch.countDown();
+		});
+		__logger.info("END");
+		latch.await();
+	}
+
+	@Test
+	public void testSubscribeVoid() {
+		AtomicInteger doOnSuccessCalled = new AtomicInteger(0);
+		AtomicInteger subscribeCalled = new AtomicInteger(0);
+		Mono.create(s -> {
+			s.success();
+		}).doOnSuccess(v -> {
+			doOnSuccessCalled.incrementAndGet();
+		}).subscribe(v -> {
+			subscribeCalled.incrementAndGet();
+		});
+		Assertions.assertEquals(1, doOnSuccessCalled.get());
+		Assertions.assertEquals(0, subscribeCalled.get());
 	}
 
 	@Test
